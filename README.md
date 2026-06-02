@@ -89,3 +89,7 @@ src/
 ```bash
 docker-compose up -d
 ```
+
+## License
+
+MIT
