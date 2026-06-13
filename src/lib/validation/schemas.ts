@@ -32,5 +32,5 @@ export const seedSchema = z.object({
 
 export const createClientSchema = z.object({
   email: z.string().email(),
-  name: z.string().min(1),
+  name: z.string().min(1).max(100),
 })
