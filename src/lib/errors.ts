@@ -40,6 +40,12 @@ export class ConflictError extends AppError {
   }
 }
 
+export class RateLimitError extends AppError {
+  constructor(message = 'Rate limit exceeded') {
+    super(message, 429, 'RATE_LIMIT')
+  }
+}
+
 export function handleApiError(err: unknown) {
   if (err instanceof AppError) {
     return { error: err.message, status: err.statusCode, code: err.code }
