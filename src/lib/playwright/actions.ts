@@ -2,7 +2,7 @@ import { type Page } from 'playwright'
 import { randomDelay } from '@/lib/utils/randomizer'
 
 async function gotoPost(page: Page, url: string) {
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 })
   await randomDelay(2000, 4000)
 }
 
