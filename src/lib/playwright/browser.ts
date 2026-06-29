@@ -1,27 +1,29 @@
 import { chromium, type Browser, type BrowserContext } from 'playwright'
 import { getStealthConfig } from '@/lib/utils/stealth'
 
-let browser: Browser | null = null
+const browsers: Browser[] = []
 
-export async function getBrowser(): Promise<Browser> {
-  if (!browser || !browser.isConnected()) {
-    browser = await chromium.launch({
-      headless: false,
-      args: [
-        '--disable-blink-features=AutomationControlled',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-      ],
-    })
-  }
+export async function createBrowser(): Promise<Browser> {
+  const browser = await chromium.launch({
+    headless: false,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
+    ],
+  })
+  browsers.push(browser)
   return browser
 }
 
-export async function createContext(storagePath?: string): Promise<BrowserContext> {
-  const b = await getBrowser()
+export async function createContext(storagePath?: string): Promise<{
+  browser: Browser
+  context: BrowserContext
+}> {
+  const browser = await createBrowser()
   const config = getStealthConfig()
 
-  const context = await b.newContext({
+  const context = await browser.newContext({
     ...config,
     storageState: storagePath ?? undefined,
   })
@@ -30,12 +32,12 @@ export async function createContext(storagePath?: string): Promise<BrowserContex
     Object.defineProperty(navigator, 'webdriver', { get: () => false })
   })
 
-  return context
+  return { browser, context }
 }
 
-export async function closeBrowser(): Promise<void> {
-  if (browser) {
-    await browser.close()
-    browser = null
+export async function closeAllBrowsers(): Promise<void> {
+  for (const b of browsers) {
+    try { await b.close() } catch {}
   }
+  browsers.length = 0
 }

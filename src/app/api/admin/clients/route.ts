@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
+import { createClientSchema } from '@/lib/validation/schemas'
 
 export async function GET() {
   const users = await prisma.user.findMany({
@@ -21,11 +22,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { email, name } = await request.json()
-
-    if (!email || !name) {
-      return NextResponse.json({ error: 'email and name required' }, { status: 400 })
+    const body = await request.json()
+    const parsed = createClientSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
     }
+
+    const { email, name } = parsed.data
 
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {

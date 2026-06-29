@@ -2,50 +2,125 @@ import path from 'path'
 import { createContext } from './browser'
 import { createMailTmAccount, waitForVerificationCode } from '@/lib/mailtm/client'
 import { generateRandomUser, randomDelay } from '@/lib/utils/randomizer'
+import { sseManager } from '@/lib/sse/manager'
+import { faker } from '@faker-js/faker'
+
+const MAX_RETRIES = 3
+
+async function retry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  accountId: string,
+  retries = MAX_RETRIES
+): Promise<T> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      sseManager.emitAccountEvent(accountId, 'step', {
+        step: 'retry',
+        message: `${label} failed (${attempt}/${retries}): ${err instanceof Error ? err.message : 'Unknown'}`,
+      })
+      if (attempt === retries) throw err
+      await randomDelay(3000, 6000)
+    }
+  }
+  throw new Error(`${label} failed after ${retries} retries`)
+}
 
 export async function createXAccount(sessionDir: string) {
+  const accountId = `acc_${crypto.randomUUID().slice(0, 8)}`
   const user = generateRandomUser()
   const mail = await createMailTmAccount()
 
-  const context = await createContext()
+  sseManager.emitAccountEvent(accountId, 'step', {
+    step: 'email_created',
+    message: `Email ${mail.address} creado`,
+  })
+
+  const { browser, context } = await createContext()
   const page = await context.newPage()
 
   try {
-    await page.goto('https://x.com/i/flow/signup', { waitUntil: 'networkidle' })
+    await retry(async () => {
+      await page.goto('https://x.com/i/flow/signup', {
+        waitUntil: 'networkidle',
+        timeout: 30000,
+      })
+    }, 'Navigate to signup', accountId)
+
     await randomDelay(2000, 4000)
 
-    await page.getByLabel('Name').fill(user.name)
+    sseManager.emitAccountEvent(accountId, 'step', {
+      step: 'filling_form',
+      message: 'Rellenando formulario...',
+    })
+
+    await retry(async () => {
+      const nameInput = page.locator('input[name="name"], input[autocomplete="name"]').first()
+      await nameInput.waitFor({ state: 'visible', timeout: 10000 })
+      await nameInput.fill(user.name)
+    }, 'Fill name', accountId)
+
     await randomDelay(1000, 2000)
 
-    const emailInput = page.getByLabel('Email', { exact: true })
-    const phoneInput = page.getByLabel('Phone')
-
-    if (await emailInput.isVisible()) {
+    const emailInput = page.locator('input[type="email"], input[name="email"]').first()
+    if (await emailInput.isVisible().catch(() => false)) {
       await emailInput.fill(mail.address)
-    } else if (await phoneInput.isVisible()) {
-      await page.getByLabel(/use email/i).click()
-      await randomDelay(500, 1000)
-      await page.getByLabel('Email', { exact: true }).fill(mail.address)
+    } else {
+      const phoneInput = page.locator('input[type="tel"]').first()
+      if (await phoneInput.isVisible().catch(() => false)) {
+        const signUpWithEmail = page.getByText(/use email/i).first()
+        if (await signUpWithEmail.isVisible().catch(() => false)) {
+          await signUpWithEmail.click()
+          await randomDelay(1000, 2000)
+        }
+        await page.locator('input[type="email"], input[name="email"]').first().fill(mail.address)
+      }
     }
 
     await randomDelay(1000, 2000)
 
-    const monthSelect = page.locator('select#SELECTOR_1')
-    const dayInput = page.locator('input#SELECTOR_2')
-    const yearInput = page.locator('input#SELECTOR_3')
+    const monthSelect = page.locator('select').first()
+    if (await monthSelect.isVisible().catch(() => false)) {
+      const selects = page.locator('select')
+      const inputs = page.locator('input[inputmode="numeric"]')
 
-    if (await monthSelect.isVisible()) {
-      await monthSelect.selectOption(String(user.birthDate.month))
-      await dayInput.fill(String(user.birthDate.day))
-      await yearInput.fill(String(user.birthDate.year))
+      if ((await selects.count()) >= 1) {
+        await selects.nth(0).selectOption(String(user.birthDate.month))
+      }
+      if ((await inputs.count()) >= 1) {
+        await inputs.nth(0).fill(String(user.birthDate.day))
+      }
+      if ((await inputs.count()) >= 2) {
+        await inputs.nth(1).fill(String(user.birthDate.year))
+      }
     }
 
     await randomDelay(1000, 2000)
-    await page.getByRole('button', { name: /next/i }).click()
+
+    const nextBtn = page.getByRole('button', { name: /next/i })
+    if (await nextBtn.isVisible().catch(() => false)) {
+      await nextBtn.click()
+    }
+
     await randomDelay(2000, 4000)
 
-    const code = await waitForVerificationCode(mail.address, mail.password)
-    await randomDelay(500, 1000)
+    sseManager.emitAccountEvent(accountId, 'step', {
+      step: 'waiting_code',
+      message: 'Esperando código de verificación...',
+    })
+
+    const code = await retry(
+      () => waitForVerificationCode(mail.address, mail.password),
+      'Get verification code',
+      accountId
+    )
+
+    sseManager.emitAccountEvent(accountId, 'step', {
+      step: 'code_received',
+      message: `Código recibido: ${code}`,
+    })
 
     const codeInputs = page.locator('input[inputmode="numeric"]')
     const count = await codeInputs.count()
@@ -54,35 +129,58 @@ export async function createXAccount(sessionDir: string) {
     }
 
     await randomDelay(2000, 4000)
-    await page.getByRole('button', { name: /next/i }).click()
+
+    sseManager.emitAccountEvent(accountId, 'step', {
+      step: 'registering',
+      message: 'Completando registro...',
+    })
+
+    const confirmNext = page.getByRole('button', { name: /next/i })
+    if (await confirmNext.isVisible().catch(() => false)) {
+      await confirmNext.click()
+    }
+
     await randomDelay(2000, 4000)
 
-    const usernameInput = page.getByLabel(/username/i)
-    if (await usernameInput.isVisible()) {
+    const usernameInput = page.locator('input[autocomplete="username"]').first()
+    if (await usernameInput.isVisible().catch(() => false)) {
       await usernameInput.fill(user.username)
       await randomDelay(1000, 2000)
-      await page.getByRole('button', { name: /next/i }).click()
+      const nextBtn2 = page.getByRole('button', { name: /next/i })
+      if (await nextBtn2.isVisible().catch(() => false)) {
+        await nextBtn2.click()
+      }
       await randomDelay(2000, 4000)
     }
 
-    const passwordInput = page.getByLabel(/password/i)
-    if (await passwordInput.isVisible()) {
+    const passwordInput = page.locator('input[type="password"]').first()
+    if (await passwordInput.isVisible().catch(() => false)) {
       await passwordInput.fill(user.password)
       await randomDelay(1000, 2000)
-      await page.getByRole('button', { name: /next/i }).click()
+      const nextBtn3 = page.getByRole('button', { name: /next/i })
+      if (await nextBtn3.isVisible().catch(() => false)) {
+        await nextBtn3.click()
+      }
       await randomDelay(2000, 4000)
     }
 
     for (let i = 0; i < 5; i++) {
-      const skipBtn = page.getByRole('button', { name: /skip|not now|next/i })
-      if (await skipBtn.isVisible().catch(() => false)) {
-        await skipBtn.click()
+      const dismissBtn = page.getByRole('button', {
+        name: /skip|not now|next|got it/i,
+      }).first()
+      if (await dismissBtn.isVisible().catch(() => false)) {
+        await dismissBtn.click()
         await randomDelay(1500, 3000)
       }
     }
 
     const storagePath = path.join(sessionDir, `${user.username}.json`)
     await context.storageState({ path: storagePath })
+
+    sseManager.emitAccountEvent(accountId, 'complete', {
+      message: 'Cuenta creada exitosamente',
+      username: user.username,
+    })
 
     return {
       username: user.username,
@@ -94,5 +192,6 @@ export async function createXAccount(sessionDir: string) {
   } finally {
     await page.close()
     await context.close()
+    await browser.close()
   }
 }

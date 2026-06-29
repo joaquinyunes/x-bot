@@ -2,17 +2,20 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { createXAccount } from '@/lib/playwright/createAccount'
 import { warmUpAccount } from '@/lib/playwright/warmUp'
+import { createAccountSchema } from '@/lib/validation/schemas'
 import path from 'path'
 
 export const maxDuration = 300
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await request.json()
-    if (!userId) {
-      return NextResponse.json({ error: 'userId required' }, { status: 400 })
+    const body = await request.json()
+    const parsed = createAccountSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
     }
 
+    const { userId } = parsed.data
     const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -34,9 +37,7 @@ export async function POST(request: Request) {
       },
     })
 
-    warmUpAccount(result.storagePath, (event) => {
-      console.log(`[warmup ${account.id}] ${event.step}: ${event.message}`)
-    })
+    warmUpAccount(account.id, result.storagePath)
       .then(async () => {
         await prisma.account.update({
           where: { id: account.id },

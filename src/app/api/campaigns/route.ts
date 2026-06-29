@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { executeCampaign } from '@/lib/playwright/campaign'
+import { createCampaignSchema } from '@/lib/validation/schemas'
+import { sseManager } from '@/lib/sse/manager'
 
 export const maxDuration = 600
 
 export async function POST(request: Request) {
   try {
-    const { userId, accountIds, urls, comments, browsersCount } = await request.json()
-
-    if (!userId || !accountIds?.length || !urls?.length) {
-      return NextResponse.json(
-        { error: 'userId, accountIds, and urls required' },
-        { status: 400 }
-      )
+    const body = await request.json()
+    const parsed = createCampaignSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
     }
+
+    const { userId, accountIds, urls, comments, commentsPerUrl, browsersCount } = parsed.data
 
     const accounts = await prisma.account.findMany({
       where: { id: { in: accountIds }, userId, status: 'READY' },
@@ -27,8 +28,8 @@ export async function POST(request: Request) {
       data: {
         userId,
         urls: JSON.stringify(urls),
-        comments: JSON.stringify(comments ?? []),
-        browsersCount: Math.min(browsersCount ?? accounts.length, accounts.length),
+        comments: JSON.stringify(comments),
+        browsersCount: Math.min(browsersCount, accounts.length),
         status: 'RUNNING',
       },
     })
@@ -38,39 +39,26 @@ export async function POST(request: Request) {
     Promise.all(
       selectedAccounts.map((account) =>
         executeCampaign({
+          campaignId: campaign.id,
           accountId: account.id,
           storagePath: account.storagePath,
           urls,
-          comments: comments ?? [],
+          comments,
+          commentsPerUrl,
         })
-          .then(async (results) => {
-            for (const r of results) {
-              if (r.type === 'action') {
-                await prisma.campaignLog.create({
-                  data: {
-                    campaignId: campaign.id,
-                    accountId: account.id,
-                    url: r.url ?? urls[0],
-                    round: r.round ?? 1,
-                    action: r.action ?? 'unknown',
-                    success: r.success ?? false,
-                    errorMessage: r.message,
-                  },
-                })
-              }
-            }
+          .then(async () => {
+            await prisma.account.update({
+              where: { id: account.id },
+              data: {
+                lastUsedAt: new Date(),
+                tweetCount: { increment: urls.length * 3 },
+              },
+            })
           })
           .catch(async (err) => {
-            await prisma.campaignLog.create({
-              data: {
-                campaignId: campaign.id,
-                accountId: account.id,
-                url: urls[0],
-                round: 0,
-                action: 'error',
-                success: false,
-                errorMessage: err.message,
-              },
+            sseManager.emitCampaignEvent(campaign.id, 'error', {
+              accountId: account.id,
+              message: err.message,
             })
           })
       )
@@ -79,6 +67,10 @@ export async function POST(request: Request) {
         await prisma.campaign.update({
           where: { id: campaign.id },
           data: { status: 'COMPLETED', finishedAt: new Date() },
+        })
+        sseManager.emitCampaignEvent(campaign.id, 'complete', {
+          message: 'Campaña finalizada',
+          status: 'COMPLETED',
         })
       })
       .catch(async () => {
@@ -104,6 +96,24 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const userId = searchParams.get('userId')
+  const id = searchParams.get('id')
+
+  if (id) {
+    const campaign = await prisma.campaign.findUnique({
+      where: { id },
+      include: {
+        campaignLogs: {
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+          include: { account: { select: { username: true } } },
+        },
+      },
+    })
+    if (!campaign) {
+      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    }
+    return NextResponse.json({ campaign })
+  }
 
   if (!userId) {
     return NextResponse.json({ error: 'userId required' }, { status: 400 })

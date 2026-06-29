@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { createContext } from '@/lib/playwright/browser'
 import { likePost, retweetPost, commentPost } from '@/lib/playwright/actions'
+import { actionSchema } from '@/lib/validation/schemas'
 
 export const maxDuration = 120
 
@@ -11,11 +12,13 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const { url, action, commentText } = await request.json()
-
-    if (!url || !action) {
-      return NextResponse.json({ error: 'url and action required' }, { status: 400 })
+    const body = await request.json()
+    const parsed = actionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
     }
+
+    const { url, action, commentText } = parsed.data
 
     const account = await prisma.account.findUnique({ where: { id } })
     if (!account) {
@@ -25,7 +28,7 @@ export async function POST(
       return NextResponse.json({ error: `Account status: ${account.status}` }, { status: 400 })
     }
 
-    const context = await createContext(account.storagePath)
+    const { browser, context } = await createContext(account.storagePath)
     const page = await context.newPage()
 
     try {
@@ -41,8 +44,6 @@ export async function POST(
         case 'comment':
           success = await commentPost(page, url, commentText ?? '')
           break
-        default:
-          return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
       }
 
       await prisma.account.update({
@@ -57,6 +58,7 @@ export async function POST(
     } finally {
       await page.close()
       await context.close()
+      await browser.close()
     }
   } catch (err) {
     return NextResponse.json(

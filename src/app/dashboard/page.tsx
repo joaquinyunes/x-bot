@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import Sidebar, { Skeleton } from '@/components/Sidebar'
 
 interface DashboardData {
   accountsCount: number
@@ -10,92 +10,82 @@ interface DashboardData {
   campaignsCount: number
   warmingCount: number
   bannedCount: number
+  expiredCount: number
 }
+
+const links = [
+  { href: '/dashboard', label: 'Dashboard', active: true },
+  { href: '/accounts', label: 'Accounts' },
+  { href: '/campaigns', label: 'Campaigns' },
+  { href: '/campaigns/new', label: 'New Campaign' },
+]
 
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<{ id: string; name: string; email: string; role: string } | null>(null)
   const [data, setData] = useState<DashboardData | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const stored = localStorage.getItem('xbot_user')
-    if (!stored) {
-      router.push('/login')
-      return
-    }
+    if (!stored) { router.push('/login'); return }
     const u = JSON.parse(stored)
     setUser(u)
-    if (u.role !== 'CLIENT') {
-      router.push('/admin/clients')
-      return
-    }
+    if (u.role !== 'CLIENT') { router.push('/admin/clients'); return }
 
     Promise.all([
       fetch(`/api/accounts?userId=${u.id}`).then(r => r.json()),
       fetch(`/api/campaigns?userId=${u.id}`).then(r => r.json()),
-    ]).then(([accountsRes, campaignsRes]) => {
-      setData({
-        accountsCount: accountsRes.total ?? 0,
-        readyCount: accountsRes.accounts?.filter((a: { status: string }) => a.status === 'READY').length ?? 0,
-        campaignsCount: campaignsRes.campaigns?.length ?? 0,
-        warmingCount: accountsRes.accounts?.filter((a: { status: string }) => a.status === 'WARMING').length ?? 0,
-        bannedCount: accountsRes.accounts?.filter((a: { status: string }) => a.status === 'BANNED').length ?? 0,
+    ])
+      .then(([accountsRes, campaignsRes]) => {
+        setData({
+          accountsCount: accountsRes.total ?? 0,
+          readyCount: accountsRes.accounts?.filter((a: { status: string }) => a.status === 'READY').length ?? 0,
+          campaignsCount: campaignsRes.campaigns?.length ?? 0,
+          warmingCount: accountsRes.accounts?.filter((a: { status: string }) => a.status === 'WARMING').length ?? 0,
+          bannedCount: accountsRes.accounts?.filter((a: { status: string }) => a.status === 'BANNED').length ?? 0,
+          expiredCount: accountsRes.accounts?.filter((a: { status: string }) => a.status === 'EXPIRED').length ?? 0,
+        })
       })
-    })
+      .catch((err) => setError(err.message))
   }, [router])
 
-  if (!user || !data) {
-    return <div className="flex flex-1 items-center justify-center"><p>Loading...</p></div>
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem('xbot_user')
-    router.push('/login')
-  }
+  if (!user) return null
 
   return (
     <div className="flex flex-1">
-      <aside className="w-64 border-r border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
-        <h2 className="font-bold text-lg">x-bot</h2>
-        <nav className="space-y-2">
-          <Link href="/dashboard" className="block rounded-lg bg-zinc-100 dark:bg-zinc-800 px-3 py-2 text-sm font-medium">Dashboard</Link>
-          <Link href="/accounts" className="block rounded-lg px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">Accounts</Link>
-          <Link href="/campaigns" className="block rounded-lg px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">Campaigns</Link>
-          <Link href="/campaigns/new" className="block rounded-lg px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">New Campaign</Link>
-        </nav>
-        <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800">
-          <p className="text-sm text-zinc-500">{user.email}</p>
-          <button onClick={handleLogout} className="text-sm text-red-500 hover:underline mt-1">Logout</button>
-        </div>
-      </aside>
+      <Sidebar links={links} />
 
       <main className="flex-1 p-8">
-        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-        <p className="text-zinc-500 mb-8">Welcome, {user.name}</p>
+        <h1 className="text-2xl font-bold mb-2">Dashboard</h1>
+        <p className="text-zinc-500 mb-8">Welcome back, {user.name}</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-6">
-            <p className="text-sm text-zinc-500">Total Accounts</p>
-            <p className="text-3xl font-bold mt-1">{data.accountsCount}</p>
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-600">{error}</div>
+        )}
+
+        {!data ? (
+          <Skeleton rows={5} />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <StatCard label="Total Accounts" value={data.accountsCount} />
+            <StatCard label="Ready" value={data.readyCount} color="text-green-600" />
+            <StatCard label="Warming" value={data.warmingCount} color="text-yellow-600" />
+            <StatCard label="Banned" value={data.bannedCount} color="text-red-600" />
+            <StatCard label="Expired" value={data.expiredCount} color="text-zinc-500" />
+            <StatCard label="Campaigns" value={data.campaignsCount} color="text-blue-600" />
           </div>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-6">
-            <p className="text-sm text-zinc-500">Ready</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">{data.readyCount}</p>
-          </div>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-6">
-            <p className="text-sm text-zinc-500">Campaigns</p>
-            <p className="text-3xl font-bold mt-1">{data.campaignsCount}</p>
-          </div>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-6">
-            <p className="text-sm text-zinc-500">Warming</p>
-            <p className="text-3xl font-bold text-yellow-600 mt-1">{data.warmingCount}</p>
-          </div>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-6">
-            <p className="text-sm text-zinc-500">Banned</p>
-            <p className="text-3xl font-bold text-red-600 mt-1">{data.bannedCount}</p>
-          </div>
-        </div>
+        )}
       </main>
+    </div>
+  )
+}
+
+function StatCard({ label, value, color }: { label: string; value: number; color?: string }) {
+  return (
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 hover:shadow-sm transition-shadow">
+      <p className="text-sm text-zinc-500">{label}</p>
+      <p className={`text-3xl font-bold mt-1 ${color ?? ''}`}>{value}</p>
     </div>
   )
 }
