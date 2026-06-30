@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useAuth } from '@/context/auth'
 import Sidebar from '@/components/Sidebar'
 
 interface CampaignDetail {
@@ -35,13 +35,14 @@ const links = [
 export default function CampaignDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null)
   const [logs, setLogs] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const stored = localStorage.getItem('xbot_user')
-    if (!stored) { router.push('/login'); return }
+    if (authLoading) return
+    if (!user) { router.push('/login'); return }
 
     const fetchCampaign = async () => {
       const res = await fetch(`/api/campaigns?id=${params.id}`)
@@ -61,7 +62,7 @@ export default function CampaignDetailPage() {
       setLogs((prev) => [...prev, `✅ ${d.message}`])
     })
     return () => evtSource.close()
-  }, [params.id, router])
+  }, [params.id, router, user, authLoading])
 
   if (loading) {
     return (

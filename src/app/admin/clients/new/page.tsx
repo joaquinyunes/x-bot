@@ -2,7 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { Sidebar } from '@/components/Sidebar'
+
+const adminLinks = [
+  { href: '/admin/clients', label: 'Clients' },
+  { href: '/admin/clients/new', label: 'New Client', active: true },
+]
 
 export default function NewClientPage() {
   const router = useRouter()
@@ -36,13 +41,7 @@ export default function NewClientPage() {
 
   return (
     <div className="flex flex-1">
-      <aside className="w-64 border-r border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
-        <h2 className="font-bold text-lg">x-bot Admin</h2>
-        <nav className="space-y-2">
-          <Link href="/admin/clients" className="block rounded-lg px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">Clients</Link>
-          <Link href="/admin/clients/new" className="block rounded-lg bg-zinc-100 dark:bg-zinc-800 px-3 py-2 text-sm font-medium">New Client</Link>
-        </nav>
-      </aside>
+      <Sidebar links={adminLinks} role="ADMIN" />
 
       <main className="flex-1 p-8 max-w-md">
         <h1 className="text-2xl font-bold mb-6">New Client</h1>

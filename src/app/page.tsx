@@ -2,19 +2,22 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/auth'
 
 export default function Home() {
   const router = useRouter()
+  const { user, loading } = useAuth()
 
   useEffect(() => {
-    const stored = localStorage.getItem('xbot_user')
-    if (stored) {
-      const user = JSON.parse(stored)
-      router.push(user.role === 'ADMIN' ? '/admin/clients' : '/dashboard')
-    } else {
+    if (loading) return
+    if (!user) {
       router.push('/login')
+    } else if (user.role === 'ADMIN') {
+      router.push('/admin/clients')
+    } else {
+      router.push('/dashboard')
     }
-  }, [router])
+  }, [user, loading, router])
 
   return (
     <div className="flex flex-1 items-center justify-center">

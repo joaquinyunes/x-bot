@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/context/auth'
 import Sidebar, { Skeleton } from '@/components/Sidebar'
 
 interface Campaign {
@@ -32,19 +33,17 @@ const statusColors: Record<string, string> = {
 
 export default function CampaignsPage() {
   const router = useRouter()
-  const [user, setUser] = useState<{ id: string } | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const stored = localStorage.getItem('xbot_user')
-    if (!stored) { router.push('/login'); return }
-    const u = JSON.parse(stored)
-    setUser(u)
-    fetch(`/api/campaigns?userId=${u.id}`)
+    if (authLoading) return
+    if (!user) { router.push('/login'); return }
+    fetch(`/api/campaigns?userId=${user.id}`)
       .then(r => r.json())
       .then(data => { setCampaigns(data.campaigns ?? []); setLoading(false) })
-  }, [router])
+  }, [user, authLoading, router])
 
   return (
     <div className="flex flex-1">

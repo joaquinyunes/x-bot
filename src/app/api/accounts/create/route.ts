@@ -2,25 +2,21 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { createXAccount } from '@/lib/playwright/createAccount'
 import { warmUpAccount } from '@/lib/playwright/warmUp'
-import { createAccountSchema } from '@/lib/validation/schemas'
+import { handleApiError } from '@/lib/errors'
+import { getSession } from '@/lib/session'
+import { rateLimitMiddleware } from '@/lib/rate-limit'
 import path from 'path'
 
 export const maxDuration = 300
 
 export async function POST(request: Request) {
+  const rl = rateLimitMiddleware(request, { limit: 3, windowMs: 300_000, keyPrefix: 'create-account' })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   try {
-    const body = await request.json()
-    const parsed = createAccountSchema.safeParse(body)
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
-    }
-
-    const { userId } = parsed.data
-    const user = await prisma.user.findUnique({ where: { id: userId } })
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
+    const user = await getSession()
     const sessionDir = path.join(process.cwd(), 'sessions')
 
     const result = await createXAccount(sessionDir)
@@ -60,9 +56,7 @@ export async function POST(request: Request) {
       status: 'WARMING',
     })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Account creation failed' },
-      { status: 500 }
-    )
+    const { error, status } = handleApiError(err)
+    return NextResponse.json({ error }, { status })
   }
 }

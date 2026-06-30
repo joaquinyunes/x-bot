@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/auth'
 import Sidebar, { Skeleton } from '@/components/Sidebar'
 
 interface DashboardData {
@@ -22,20 +23,18 @@ const links = [
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [user, setUser] = useState<{ id: string; name: string; email: string; role: string } | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const stored = localStorage.getItem('xbot_user')
-    if (!stored) { router.push('/login'); return }
-    const u = JSON.parse(stored)
-    setUser(u)
-    if (u.role !== 'CLIENT') { router.push('/admin/clients'); return }
+    if (authLoading) return
+    if (!user) { router.push('/login'); return }
+    if (user.role !== 'CLIENT') { router.push('/admin/clients'); return }
 
     Promise.all([
-      fetch(`/api/accounts?userId=${u.id}`).then(r => r.json()),
-      fetch(`/api/campaigns?userId=${u.id}`).then(r => r.json()),
+      fetch(`/api/accounts?userId=${user.id}`).then(r => r.json()),
+      fetch(`/api/campaigns?userId=${user.id}`).then(r => r.json()),
     ])
       .then(([accountsRes, campaignsRes]) => {
         setData({
@@ -48,7 +47,7 @@ export default function DashboardPage() {
         })
       })
       .catch((err) => setError(err.message))
-  }, [router])
+  }, [user, authLoading, router])
 
   if (!user) return null
 

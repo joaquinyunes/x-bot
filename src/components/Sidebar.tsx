@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/auth'
 
 interface SidebarLink {
   href: string
@@ -15,11 +15,10 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ links, role }: SidebarProps) {
-  const router = useRouter()
+  const { logout } = useAuth()
 
-  const handleLogout = () => {
-    localStorage.removeItem('xbot_user')
-    router.push('/login')
+  const handleLogout = async () => {
+    await logout()
   }
 
   return (
@@ -59,10 +58,11 @@ export default function Sidebar({ links, role }: SidebarProps) {
 }
 
 export function Skeleton({ className = '', rows = 3 }: { className?: string; rows?: number }) {
+  const widths = [70, 85, 60, 90, 75]
   return (
     <div className={`space-y-3 ${className}`}>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
+        <div key={i} className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" style={{ width: `${widths[i % widths.length]}%` }} />
       ))}
     </div>
   )

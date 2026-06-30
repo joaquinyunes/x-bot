@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db'
 import { createContext } from '@/lib/playwright/browser'
 import { likePost, retweetPost, commentPost } from '@/lib/playwright/actions'
 import { actionSchema } from '@/lib/validation/schemas'
+import { handleApiError } from '@/lib/errors'
+import { getSession } from '@/lib/session'
 
 export const maxDuration = 120
 
@@ -11,6 +13,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getSession()
     const { id } = await params
     const body = await request.json()
     const parsed = actionSchema.safeParse(body)
@@ -20,7 +23,7 @@ export async function POST(
 
     const { url, action, commentText } = parsed.data
 
-    const account = await prisma.account.findUnique({ where: { id } })
+    const account = await prisma.account.findFirst({ where: { id, userId: user.id } })
     if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
@@ -61,9 +64,7 @@ export async function POST(
       await browser.close()
     }
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Action failed' },
-      { status: 500 }
-    )
+    const { error, status } = handleApiError(err)
+    return NextResponse.json({ error }, { status })
   }
 }

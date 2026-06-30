@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/context/auth'
+import { Sidebar } from '@/components/Sidebar'
 
 interface Client {
   id: string
@@ -12,18 +14,21 @@ interface Client {
   _count: { accounts: number; campaigns: number }
 }
 
+const adminLinks = [
+  { href: '/admin/clients', label: 'Clients', active: true },
+  { href: '/admin/clients/new', label: 'New Client' },
+]
+
 export default function AdminClientsPage() {
   const router = useRouter()
-  const [user, setUser] = useState<{ role: string } | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const stored = localStorage.getItem('xbot_user')
-    if (!stored) { router.push('/login'); return }
-    const u = JSON.parse(stored)
-    setUser(u)
-    if (u.role !== 'ADMIN') { router.push('/dashboard'); return }
+    if (authLoading) return
+    if (!user) { router.push('/login'); return }
+    if (user.role !== 'ADMIN') { router.push('/dashboard'); return }
 
     fetch('/api/admin/clients')
       .then(r => r.json())
@@ -31,27 +36,13 @@ export default function AdminClientsPage() {
         setClients(data.clients ?? [])
         setLoading(false)
       })
-  }, [router])
-
-  const handleLogout = () => {
-    localStorage.removeItem('xbot_user')
-    router.push('/login')
-  }
+  }, [user, authLoading, router])
 
   if (!user) return null
 
   return (
     <div className="flex flex-1">
-      <aside className="w-64 border-r border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
-        <h2 className="font-bold text-lg">x-bot Admin</h2>
-        <nav className="space-y-2">
-          <Link href="/admin/clients" className="block rounded-lg bg-zinc-100 dark:bg-zinc-800 px-3 py-2 text-sm font-medium">Clients</Link>
-          <Link href="/admin/clients/new" className="block rounded-lg px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">New Client</Link>
-        </nav>
-        <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800">
-          <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">Logout</button>
-        </div>
-      </aside>
+      <Sidebar links={adminLinks} role="ADMIN" />
 
       <main className="flex-1 p-8">
         <div className="flex items-center justify-between mb-6">

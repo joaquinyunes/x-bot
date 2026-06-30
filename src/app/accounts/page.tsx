@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/auth'
 import Sidebar, { Skeleton } from '@/components/Sidebar'
 
 interface Account {
@@ -22,7 +23,7 @@ const clientLinks = (active: string) => [
 
 export default function AccountsPage() {
   const router = useRouter()
-  const [user, setUser] = useState<{ id: string; role: string } | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -31,20 +32,32 @@ export default function AccountsPage() {
   const [accountId, setAccountId] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
 
-  const loadAccounts = useCallback(async (userId: string) => {
-    const res = await fetch(`/api/accounts?userId=${userId}`)
-    const data = await res.json()
-    setAccounts(data.accounts ?? [])
-    setLoading(false)
-  }, [])
-
   useEffect(() => {
-    const stored = localStorage.getItem('xbot_user')
-    if (!stored) { router.push('/login'); return }
-    const u = JSON.parse(stored)
-    setUser(u)
-    loadAccounts(u.id)
-  }, [router, loadAccounts])
+    if (authLoading) return
+    if (!user) { router.push('/login'); return }
+
+    let cancelled = false
+    fetch(`/api/accounts?userId=${user.id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!cancelled) {
+          setAccounts(data.accounts ?? [])
+          setLoading(false)
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [user, authLoading, router])
+
+  const reloadAccounts = useCallback(() => {
+    if (!user) return
+    fetch(`/api/accounts?userId=${user.id}`)
+      .then(r => r.json())
+      .then(data => {
+        setAccounts(data.accounts ?? [])
+        setLoading(false)
+      })
+  }, [user])
 
   useEffect(() => {
     if (!accountId) return
@@ -55,13 +68,13 @@ export default function AccountsPage() {
     })
     evtSource.addEventListener('complete', () => {
       evtSource.close()
-      loadAccounts(user!.id)
+      reloadAccounts()
     })
     evtSource.addEventListener('error', () => {
       evtSource.close()
     })
     return () => evtSource.close()
-  }, [accountId, user, loadAccounts])
+  }, [accountId, reloadAccounts])
 
   const handleCreate = async () => {
     if (!user) return
@@ -91,7 +104,7 @@ export default function AccountsPage() {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error('Failed to delete')
-      await loadAccounts(user.id)
+      reloadAccounts()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed')
     } finally {

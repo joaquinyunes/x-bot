@@ -2,8 +2,15 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import { loginSchema } from '@/lib/validation/schemas'
+import { handleApiError } from '@/lib/errors'
+import { rateLimitMiddleware } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
+  const rl = rateLimitMiddleware(request, { limit: 10, windowMs: 60_000 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   try {
     const body = await request.json()
     const parsed = loginSchema.safeParse(body)
@@ -14,12 +21,12 @@ export async function POST(request: Request) {
     const { email, password } = parsed.data
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 401 })
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
     const valid = await bcrypt.compare(password, user.password ?? '')
     if (!valid) {
-      return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
     const response = NextResponse.json({
@@ -41,9 +48,7 @@ export async function POST(request: Request) {
 
     return response
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Login failed' },
-      { status: 500 }
-    )
+    const { error, status } = handleApiError(err)
+    return NextResponse.json({ error }, { status })
   }
 }

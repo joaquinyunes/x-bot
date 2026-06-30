@@ -25,15 +25,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem('xbot_user')
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored))
-      } catch {
-        localStorage.removeItem('xbot_user')
-      }
-    }
-    setLoading(false)
+    fetch('/api/auth/me')
+      .then((res) => {
+        if (res.ok) return res.json()
+        throw new Error('Not authenticated')
+      })
+      .then((data) => setUser(data))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false))
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
@@ -54,7 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const userData: User = await res.json()
       setUser(userData)
-      localStorage.setItem('xbot_user', JSON.stringify(userData))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
       throw err
@@ -63,9 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     setUser(null)
-    localStorage.removeItem('xbot_user')
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
   }, [])
 
   return (

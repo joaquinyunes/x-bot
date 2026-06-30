@@ -3,21 +3,30 @@ import { prisma } from '@/lib/db'
 import { executeCampaign } from '@/lib/playwright/campaign'
 import { createCampaignSchema } from '@/lib/validation/schemas'
 import { sseManager } from '@/lib/sse/manager'
+import { handleApiError } from '@/lib/errors'
+import { getSession } from '@/lib/session'
+import { rateLimitMiddleware } from '@/lib/rate-limit'
 
 export const maxDuration = 600
 
 export async function POST(request: Request) {
+  const rl = rateLimitMiddleware(request, { limit: 3, windowMs: 600_000, keyPrefix: 'campaign' })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   try {
+    const user = await getSession()
     const body = await request.json()
     const parsed = createCampaignSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
     }
 
-    const { userId, accountIds, urls, comments, commentsPerUrl, browsersCount } = parsed.data
+    const { accountIds, urls, comments, commentsPerUrl, browsersCount } = parsed.data
 
     const accounts = await prisma.account.findMany({
-      where: { id: { in: accountIds }, userId, status: 'READY' },
+      where: { id: { in: accountIds }, userId: user.id, status: 'READY' },
     })
 
     if (accounts.length === 0) {
@@ -26,7 +35,7 @@ export async function POST(request: Request) {
 
     const campaign = await prisma.campaign.create({
       data: {
-        userId,
+        userId: user.id,
         urls: JSON.stringify(urls),
         comments: JSON.stringify(comments),
         browsersCount: Math.min(browsersCount, accounts.length),
@@ -86,44 +95,43 @@ export async function POST(request: Request) {
       accountsCount: selectedAccounts.length,
     })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Campaign creation failed' },
-      { status: 500 }
-    )
+    const { error, status } = handleApiError(err)
+    return NextResponse.json({ error }, { status })
   }
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const userId = searchParams.get('userId')
-  const id = searchParams.get('id')
+  try {
+    const user = await getSession()
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
 
-  if (id) {
-    const campaign = await prisma.campaign.findUnique({
-      where: { id },
-      include: {
-        campaignLogs: {
-          orderBy: { createdAt: 'desc' },
-          take: 200,
-          include: { account: { select: { username: true } } },
+    if (id) {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id },
+        include: {
+          campaignLogs: {
+            orderBy: { createdAt: 'desc' },
+            take: 200,
+            include: { account: { select: { username: true } } },
+          },
         },
-      },
-    })
-    if (!campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+      })
+      if (!campaign) {
+        return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+      }
+      return NextResponse.json({ campaign })
     }
-    return NextResponse.json({ campaign })
+
+    const campaigns = await prisma.campaign.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { campaignLogs: true } } },
+    })
+
+    return NextResponse.json({ campaigns })
+  } catch (err) {
+    const { error, status } = handleApiError(err)
+    return NextResponse.json({ error }, { status })
   }
-
-  if (!userId) {
-    return NextResponse.json({ error: 'userId required' }, { status: 400 })
-  }
-
-  const campaigns = await prisma.campaign.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { campaignLogs: true } } },
-  })
-
-  return NextResponse.json({ campaigns })
 }

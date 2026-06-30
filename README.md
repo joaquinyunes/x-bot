@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# x-bot
 
-## Getting Started
+X (Twitter) automation platform built with Next.js, Playwright, and Prisma.
 
-First, run the development server:
+## Features
+
+- **Account Creation** - Automated X account creation with temporary emails (Mail.tm)
+- **Account Warming** - Human-like browsing to make accounts appear legitimate
+- **Campaigns** - Bulk like, retweet, comment, and video plays across multiple accounts
+- **Multi-tenant** - Admin creates clients; each client manages their own accounts
+- **Anti-detection** - Randomized user agents, viewports, timezones, and human-like delays
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript |
+| Database | SQLite via Prisma |
+| Browser Automation | Playwright (Chromium) |
+| Styling | Tailwind CSS v4 |
+| Validation | Zod |
+
+## Setup
 
 ```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+
+# Run database migrations
+npx prisma migrate dev
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | SQLite database path | `file:./dev.db` |
+| `NEXT_PUBLIC_APP_URL` | Application URL | `http://localhost:3000` |
+| `MAILTM_API_URL` | Mail.tm API endpoint | `https://api.mail.tm` |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Initial Setup
 
-## Learn More
+1. Start the dev server: `npm run dev`
+2. Create the first admin via the seed endpoint:
+   ```bash
+   curl -X POST http://localhost:3000/api/seed \
+     -H "Content-Type: application/json" \
+     -d '{"email":"admin@example.com","password":"admin123"}'
+   ```
+3. Login with the admin credentials
+4. Create clients from the admin panel
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run start    # Start production server
+npm run lint     # Run ESLint
+npm test         # Run tests
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+```
+src/
+├── app/              # Next.js App Router pages and API routes
+├── components/       # React components
+├── context/          # React context (auth)
+├── lib/              # Core libraries
+│   ├── playwright/   # Browser automation engine
+│   ├── mailtm/       # Temporary email client
+│   ├── sse/          # Server-Sent Events manager
+│   ├── utils/        # Stealth config, random data generator
+│   ├── validation/   # Zod schemas
+│   └── errors.ts     # Error handling system
+└── proxy.ts          # Next.js middleware (auth protection)
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Docker
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+docker-compose up -d
+```

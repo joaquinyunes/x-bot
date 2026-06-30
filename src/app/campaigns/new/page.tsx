@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Sidebar, { Skeleton } from '@/components/Sidebar'
+import { useAuth } from '@/context/auth'
+import Sidebar from '@/components/Sidebar'
 
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -14,7 +15,7 @@ const links = [
 
 export default function NewCampaignPage() {
   const router = useRouter()
-  const [user, setUser] = useState<{ id: string } | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [accounts, setAccounts] = useState<Array<{ id: string; username: string; status: string }>>([])
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
   const [urls, setUrls] = useState('')
@@ -28,14 +29,12 @@ export default function NewCampaignPage() {
   const [urlComments, setUrlComments] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    const stored = localStorage.getItem('xbot_user')
-    if (!stored) { router.push('/login'); return }
-    const u = JSON.parse(stored)
-    setUser(u)
-    fetch(`/api/accounts?userId=${u.id}&status=READY`)
+    if (authLoading) return
+    if (!user) { router.push('/login'); return }
+    fetch(`/api/accounts?userId=${user.id}&status=READY`)
       .then(r => r.json())
       .then(data => setAccounts(data.accounts ?? []))
-  }, [router])
+  }, [user, authLoading, router])
 
   useEffect(() => {
     if (!campaignId) return

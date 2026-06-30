@@ -2,26 +2,37 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import { createClientSchema } from '@/lib/validation/schemas'
+import { handleApiError, ConflictError } from '@/lib/errors'
+import { requireAdmin } from '@/lib/session'
 
 export async function GET() {
-  const users = await prisma.user.findMany({
-    where: { role: 'CLIENT' },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      createdAt: true,
-      _count: { select: { accounts: true, campaigns: true } },
-    },
-  })
+  try {
+    await requireAdmin()
 
-  return NextResponse.json({ clients: users })
+    const users = await prisma.user.findMany({
+      where: { role: 'CLIENT' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        _count: { select: { accounts: true, campaigns: true } },
+      },
+    })
+
+    return NextResponse.json({ clients: users })
+  } catch (err) {
+    const { error, status } = handleApiError(err)
+    return NextResponse.json({ error }, { status })
+  }
 }
 
 export async function POST(request: Request) {
   try {
+    await requireAdmin()
+
     const body = await request.json()
     const parsed = createClientSchema.safeParse(body)
     if (!parsed.success) {
@@ -32,7 +43,7 @@ export async function POST(request: Request) {
 
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
-      return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
+      throw new ConflictError('Email already registered')
     }
 
     const tempPassword = crypto.randomUUID().slice(0, 12) + 'A1!'
@@ -56,9 +67,7 @@ export async function POST(request: Request) {
       tempPassword,
     })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to create client' },
-      { status: 500 }
-    )
+    const { error, status } = handleApiError(err)
+    return NextResponse.json({ error }, { status })
   }
 }

@@ -1,0 +1,18 @@
+services:
+  x-bot:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./sessions:/app/sessions
+      - ./prisma:/app/prisma
+      - db-data:/app/prisma
+    environment:
+      - DATABASE_URL=file:./dev.db
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - MAILTM_API_URL=https://api.mail.tm
+      - NODE_ENV=production
+    restart: unless-stopped
+
+volumes:
+  db-data:
