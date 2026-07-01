@@ -1,0 +1,199 @@
+openapi: 3.0.3
+info:
+  title: x-bot API
+  description: X (Twitter) automation platform API
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:3000/api
+
+paths:
+  /auth/login:
+    post:
+      summary: Login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+
+  /auth/logout:
+    post:
+      summary: Logout
+      tags: [Auth]
+      responses:
+        '200':
+          description: Logged out
+
+  /auth/me:
+    get:
+      summary: Get current user
+      tags: [Auth]
+      responses:
+        '200':
+          description: Current user info
+
+  /accounts:
+    get:
+      summary: List accounts
+      tags: [Accounts]
+      responses:
+        '200':
+          description: List of accounts
+
+  /accounts/create:
+    post:
+      summary: Create X account
+      tags: [Accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, username]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                username:
+                  type: string
+      responses:
+        '201':
+          description: Account creation started
+
+  /accounts/{id}/actions:
+    post:
+      summary: Execute action on account
+      tags: [Accounts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [warmup, like, retweet, comment]
+      responses:
+        '200':
+          description: Action executed
+
+  /campaigns:
+    get:
+      summary: List campaigns
+      tags: [Campaigns]
+      responses:
+        '200':
+          description: List of campaigns
+    post:
+      summary: Create campaign
+      tags: [Campaigns]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [urls, comments, browsersCount, accountIds]
+              properties:
+                urls:
+                  type: array
+                  items:
+                    type: string
+                comments:
+                  type: array
+                  items:
+                    type: string
+                browsersCount:
+                  type: integer
+                accountIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Campaign created
+
+  /metrics:
+    get:
+      summary: Get dashboard metrics
+      tags: [Metrics]
+      responses:
+        '200':
+          description: Dashboard metrics
+
+  /reports:
+    get:
+      summary: Export report
+      tags: [Reports]
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [campaigns, accounts]
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+      responses:
+        '200':
+          description: Report data
+
+  /stream:
+    get:
+      summary: SSE stream for real-time events
+      tags: [Stream]
+      responses:
+        '200':
+          description: Event stream
+
+  /admin/clients:
+    get:
+      summary: List clients (admin only)
+      tags: [Admin]
+      responses:
+        '200':
+          description: List of clients
+    post:
+      summary: Create client (admin only)
+      tags: [Admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Client created

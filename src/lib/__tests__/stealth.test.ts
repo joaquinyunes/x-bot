@@ -7,7 +7,7 @@ describe('getStealthConfig', () => {
 
     expect(config.userAgent).toBeDefined()
     expect(typeof config.userAgent).toBe('string')
-    expect(config.userAgent.length).toBeGreaterThan(0)
+    expect(config.userAgent!.length).toBeGreaterThan(0)
 
     expect(config.viewport).toBeDefined()
     expect(config.viewport!.width).toBeGreaterThanOrEqual(1200)

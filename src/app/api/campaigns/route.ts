@@ -20,10 +20,16 @@ export async function POST(request: Request) {
     const body = await request.json()
     const parsed = createCampaignSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
     }
 
-    const { accountIds, urls, comments, commentsPerUrl, browsersCount } = parsed.data
+    const { accountIds, urls, comments, commentsPerUrl, browsersCount } = parsed.data as {
+      accountIds: string[]
+      urls: string[]
+      comments: string[]
+      commentsPerUrl?: Record<string, string[]>
+      browsersCount: number
+    }
 
     const accounts = await prisma.account.findMany({
       where: { id: { in: accountIds }, userId: user.id, status: 'READY' },

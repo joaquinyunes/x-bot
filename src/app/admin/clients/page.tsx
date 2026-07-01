@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/context/auth'
-import { Sidebar } from '@/components/Sidebar'
+import Sidebar from '@/components/Sidebar'
 
 interface Client {
   id: string

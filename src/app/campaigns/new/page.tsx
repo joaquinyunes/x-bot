@@ -52,9 +52,8 @@ export default function NewCampaignPage() {
       evtSource.close()
       setTimeout(() => router.push('/campaigns'), 2000)
     })
-    evtSource.addEventListener('error', (e) => {
-      const d = JSON.parse(e.data)
-      setLogs((prev) => [...prev, `❌ Error: ${d.message}`])
+    evtSource.addEventListener('error', () => {
+      setLogs((prev) => [...prev, '❌ Connection error'])
     })
     return () => evtSource.close()
   }, [campaignId, router])

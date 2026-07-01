@@ -20,7 +20,7 @@ export const createCampaignSchema = z.object({
   accountIds: z.array(z.string()).min(1),
   urls: z.array(z.string().url()).min(1),
   comments: z.array(z.string()).optional().default([]),
-  commentsPerUrl: z.record(z.array(z.string())).optional(),
+  commentsPerUrl: z.record(z.string(), z.array(z.string())).optional(),
   browsersCount: z.number().int().min(1).max(5).optional().default(1),
 })
 
