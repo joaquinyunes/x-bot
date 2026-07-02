@@ -9,6 +9,7 @@ export interface DashboardMetrics {
     active: number
     creating: number
     failed: number
+    growth?: number
   }
   campaigns: {
     total: number
