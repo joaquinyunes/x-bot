@@ -12,7 +12,15 @@ services:
       - MAILTM_API_URL=${MAILTM_API_URL:-https://api.mail.tm}
       - PROXY_LIST=${PROXY_LIST:-}
       - NODE_ENV=production
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-10}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/auth/me"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   db-data:
