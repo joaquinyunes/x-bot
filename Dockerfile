@@ -24,6 +24,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 
 RUN mkdir -p /app/sessions && chown nextjs:nodejs /app/sessions
 

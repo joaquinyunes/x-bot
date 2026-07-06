@@ -5,12 +5,12 @@ services:
       - "3000:3000"
     volumes:
       - ./sessions:/app/sessions
-      - ./prisma:/app/prisma
-      - db-data:/app/prisma
+      - db-data:/app/data
     environment:
-      - DATABASE_URL=file:./dev.db
-      - NEXT_PUBLIC_APP_URL=http://localhost:3000
-      - MAILTM_API_URL=https://api.mail.tm
+      - DATABASE_URL=file:/app/data/prod.db
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - MAILTM_API_URL=${MAILTM_API_URL:-https://api.mail.tm}
+      - PROXY_LIST=${PROXY_LIST:-}
       - NODE_ENV=production
     restart: unless-stopped
 
