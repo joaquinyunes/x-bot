@@ -1,7 +1,6 @@
 interface RateLimitEntry {
   count: number
-  resetTime: number
-  lastAccess: number
+  resetAt: number
 }
 
 const store = new Map<string, RateLimitEntry>()

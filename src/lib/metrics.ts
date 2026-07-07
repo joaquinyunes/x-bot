@@ -66,7 +66,7 @@ export async function getDashboardMetrics(userId?: string): Promise<DashboardMet
 
     const accountStats = {
       total: accounts.reduce((sum, g) => sum + g._count, 0),
-      active: accounts.find(g => g.status === 'ACTIVE')?._count ?? 0,
+      active: accounts.find(g => g.status === 'READY')?._count ?? 0,
       creating: accounts.find(g => g.status === 'CREATING')?._count ?? 0,
       failed: accounts.find(g => g.status === 'FAILED')?._count ?? 0,
     }

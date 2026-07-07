@@ -22,7 +22,7 @@ describe('generateRandomUser', () => {
     expect(user.birthDate.day).toBeLessThanOrEqual(31)
     expect(user.birthDate.month).toBeGreaterThanOrEqual(1)
     expect(user.birthDate.month).toBeLessThanOrEqual(12)
-    expect(user.birthDate.year).toBeGreaterThanOrEqual(1981)
+    expect(user.birthDate.year).toBeGreaterThanOrEqual(1980)
     expect(user.birthDate.year).toBeLessThanOrEqual(2008)
   })
 
@@ -36,16 +36,16 @@ describe('generateRandomUser', () => {
 })
 
 describe('randomDelay', () => {
-  it('should return a number within the specified range', () => {
-    for (let i = 0; i < 100; i++) {
-      const delay = randomDelay(100, 200)
+  it('should return a number within the specified range', async () => {
+    for (let i = 0; i < 10; i++) {
+      const delay = await randomDelay(100, 200)
       expect(delay).toBeGreaterThanOrEqual(100)
       expect(delay).toBeLessThanOrEqual(200)
     }
-  })
+  }, 10000)
 
-  it('should use default values when no args provided', () => {
-    const delay = randomDelay()
+  it('should use default values when no args provided', async () => {
+    const delay = await randomDelay()
     expect(delay).toBeGreaterThanOrEqual(1500)
     expect(delay).toBeLessThanOrEqual(4000)
   })

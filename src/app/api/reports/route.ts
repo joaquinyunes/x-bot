@@ -30,7 +30,7 @@ export async function GET(request: Request) {
           c.id,
           c.user.email,
           c.status,
-          c.urls.split(',').length,
+          JSON.parse(c.urls).length,
           c.browsersCount,
           c.createdAt.toISOString(),
           c.finishedAt?.toISOString() ?? '',

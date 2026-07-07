@@ -23,13 +23,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
     }
 
-    const { accountIds, urls, comments, commentsPerUrl, browsersCount } = parsed.data as {
-      accountIds: string[]
-      urls: string[]
-      comments: string[]
-      commentsPerUrl?: Record<string, string[]>
-      browsersCount: number
-    }
+    const { accountIds, urls, comments, commentsPerUrl, browsersCount } = parsed.data
 
     const accounts = await prisma.account.findMany({
       where: { id: { in: accountIds }, userId: user.id, status: 'READY' },
@@ -113,8 +107,8 @@ export async function GET(request: Request) {
     const id = searchParams.get('id')
 
     if (id) {
-      const campaign = await prisma.campaign.findUnique({
-        where: { id },
+      const campaign = await prisma.campaign.findFirst({
+        where: { id, userId: user.id },
         include: {
           campaignLogs: {
             orderBy: { createdAt: 'desc' },

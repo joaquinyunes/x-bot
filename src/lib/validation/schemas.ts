@@ -16,7 +16,6 @@ export const actionSchema = z.object({
 })
 
 export const createCampaignSchema = z.object({
-  userId: z.string().min(1),
   accountIds: z.array(z.string()).min(1),
   urls: z.array(z.string().url()).min(1),
   comments: z.array(z.string()).optional().default([]),

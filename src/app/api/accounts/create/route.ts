@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         console.error(`[warmup ${account.id}] failed:`, err)
         await prisma.account.update({
           where: { id: account.id },
-          data: { status: 'READY' },
+          data: { status: 'FAILED' },
         })
       })
 

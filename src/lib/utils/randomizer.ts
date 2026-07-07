@@ -17,6 +17,7 @@ export function generateRandomUser() {
   }
 }
 
-export function randomDelay(min = 1500, max = 4000): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min
+export function randomDelay(min = 1500, max = 4000): Promise<number> {
+  const ms = Math.floor(Math.random() * (max - min + 1)) + min
+  return new Promise((resolve) => setTimeout(() => resolve(ms), ms))
 }
